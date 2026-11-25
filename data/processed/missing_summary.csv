@@ -1,0 +1,53 @@
+group,field,column,dtype,n_missing,pct_missing,decision
+track,lyricist,track.lyricist,str,106263,99.71,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+track,publisher,track.publisher,str,105311,98.81,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+track,information,track.information,str,104225,97.8,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+track,composer,track.composer,str,102904,96.56,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+artist,active_year_end,artist.active_year_end,datetime64[us],101199,94.96,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+artist,wikipedia_page,artist.wikipedia_page,str,100993,94.76,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+track,date_recorded,track.date_recorded,datetime64[us],100415,94.22,Kept for reference; mostly missing so not used.
+artist,related_projects,artist.related_projects,str,93422,87.66,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+artist,associated_labels,artist.associated_labels,str,92303,86.61,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+track,language_code,track.language_code,str,91550,85.9,Kept for reference; mostly missing so not modelled.
+album,engineer,album.engineer,str,91279,85.65,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+album,producer,album.producer,str,88514,83.05,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+artist,active_year_begin,artist.active_year_begin,datetime64[us],83863,78.69,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+album,tags,album.tags,str,83549,78.4,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+track,tags,track.tags,str,83078,77.95,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+artist,latitude,artist.latitude,float64,62030,58.2,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+artist,longitude,artist.longitude,float64,62030,58.2,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+artist,members,artist.members,str,59725,56.04,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+track,genre_top,track.genre_top,str,56976,53.46,Kept. Missing = track has several top-level genres or none. Rows are kept for EDA; excluded only from genre-based tests and models (the label cannot be imputed).
+artist,location,artist.location,str,36364,34.12,"Kept for reference; free text, not modelled."
+album,date_released,album.date_released,datetime64[us],36280,34.04,Kept; used for release year. Missing years shown as 'Unknown' and excluded only from year-based analyses.
+artist,bio,artist.bio,str,35418,33.23,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+artist,website,artist.website,str,27318,25.63,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+album,information,album.information,str,23425,21.98,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+album,type,album.type,str,6508,6.11,Kept for reference.
+album,date_created,album.date_created,datetime64[us],3529,3.31,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+artist,tags,artist.tags,str,3061,2.87,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+track,genres_all,track.genres_all,str,2231,2.09,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+track,genres,track.genres,str,2231,2.09,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+album,title,album.title,str,1025,0.96,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+artist,date_created,artist.date_created,datetime64[us],856,0.8,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+track,license,track.license,str,87,0.08,"Kept; missing filled with 'Unknown' (category, not imputed)."
+album,listens,album.listens,int64,0,0.0,Kept for reference.
+album,id,album.id,int64,0,0.0,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+album,comments,album.comments,int64,0,0.0,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+album,tracks,album.tracks,int64,0,0.0,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+artist,favorites,artist.favorites,int64,0,0.0,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+artist,comments,artist.comments,int64,0,0.0,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+album,favorites,album.favorites,int64,0,0.0,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+track,bit_rate,track.bit_rate,int64,0,0.0,Kept (no missing values expected).
+set,split,set.split,str,0,0.0,Kept; official train/validation/test split.
+artist,name,artist.name,str,0,0.0,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+artist,id,artist.id,int64,0,0.0,Kept (used to count artists per genre).
+set,subset,set.subset,str,0,0.0,Kept; selects the balanced 'small' subset.
+track,date_created,track.date_created,datetime64[us],0,0.0,"Kept; upload date, used for upload-year trends."
+track,comments,track.comments,int64,0,0.0,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+track,duration,track.duration,int64,0,0.0,"Kept. Zero-length tracks are set to missing (invalid); very long tracks are flagged, not removed."
+track,favorites,track.favorites,int64,0,0.0,Kept for group-by summaries.
+track,interest,track.interest,int64,0,0.0,Kept for group-by summaries.
+track,listens,track.listens,int64,0,0.0,"Kept. Heavy right tail, so analysed on a log1p scale."
+track,number,track.number,int64,0,0.0,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."
+track,title,track.title,str,1,0.0,"Not used by the analysis (free text / IDs / mostly empty), so not carried forward."

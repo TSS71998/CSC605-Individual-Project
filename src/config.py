@@ -18,6 +18,8 @@ ECHONEST_PQ = DATA_PROCESSED / "echonest_audio.parquet"
 CLEANING_LOG = DATA_PROCESSED / "cleaning_log.json"
 MODEL_RESULTS = RESULTS / "model_results.joblib"
 
+RANDOM_STATE = 42
+
 ECHONEST_AUDIO = ["acousticness", "danceability", "energy", "instrumentalness",
                   "liveness", "speechiness", "tempo", "valence"]
 

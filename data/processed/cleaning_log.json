@@ -1,0 +1,28 @@
+{
+  "raw_tracks_shape": [
+    106574,
+    52
+  ],
+  "duplicate_track_ids": 0,
+  "tracks_rows": 106574,
+  "genre_top_missing": 56976,
+  "duration_invalid_set_missing": 16,
+  "duration_iqr_bounds_sec": [
+    50.6,
+    900.6
+  ],
+  "duration_outliers_flagged": 7010,
+  "duration_over_1h": 139,
+  "listens_outliers_flagged": 895,
+  "listens_zero": 1,
+  "release_year_implausible_set_missing": 5,
+  "release_year_missing": 36285,
+  "raw_features_shape": [
+    106574,
+    518
+  ],
+  "features_missing_cells": 0,
+  "small_subset_rows": 8000,
+  "echonest_rows": 13129,
+  "echonest_rows_with_genre": 9355
+}
