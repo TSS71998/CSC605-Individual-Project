@@ -1,0 +1,9 @@
+streamlit>=1.40
+pandas>=2.1
+numpy>=1.26
+scipy>=1.11
+scikit-learn>=1.4
+statsmodels>=0.14
+matplotlib>=3.9
+pyarrow>=14
+joblib>=1.3
