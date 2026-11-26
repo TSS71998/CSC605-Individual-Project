@@ -8,10 +8,10 @@ import matplotlib.pyplot as plt
 
 import cleaning
 import eda
+import stats_tests
 from config import ECHONEST_AUDIO, FIGURES, MODEL_RESULTS
 from data_loader import (feature_columns, load_cleaning_log, load_echonest,
                          load_missing_summary, load_small_features, load_tracks)
-
 
 def main():
     FIGURES.mkdir(exist_ok=True)
@@ -28,6 +28,9 @@ def main():
         "07_echonest_correlation": eda.fig_corr(echo, ECHONEST_AUDIO),
         "08_pca": eda.fig_pca(small, fcols),
         "09_feature_outliers": eda.fig_feature_outliers(cleaning.feature_outlier_summary(small[fcols])),
+        "10_energy_by_genre": eda.fig_energy_box(stats_tests.energy_by_genre(echo)),
+        "11_genre_era_residuals": eda.fig_chi2_residuals(stats_tests.genre_era_chi2(tracks)),
+        "12_spearman_listens": eda.fig_spearman(stats_tests.audio_listens_spearman(echo, ECHONEST_AUDIO)),
     }
     for name, (fig, caption, _) in figs.items():
         fig.savefig(FIGURES / f"{name}.png", bbox_inches="tight")

@@ -257,3 +257,61 @@ def fig_feature_outliers(df):
               "measurement errors. Decision: keep them. The tree models are unaffected by scale, and the "
               "linear and k-NN models use standardized inputs.")
     return fig, "Figure 9. Share of tracks with extreme (|z| > 4) values per feature family.", interp
+
+def fig_energy_box(res, feature="energy"):
+    d, order = res["data"], res["order"]
+    fig, ax = plt.subplots(figsize=(9, 4.5))
+    data = [d.loc[d["genre_top"] == g, feature] for g in order]
+    bp = ax.boxplot(data, tick_labels=order, patch_artist=True, widths=0.6,
+                    medianprops=dict(color=TEXT, lw=1.5), flierprops=dict(marker="o", ms=2, alpha=0.3,
+                                                                          markeredgecolor=TEXT2))
+    for b in bp["boxes"]:
+        b.set(facecolor="#cce3fd", edgecolor=BLUE)
+    ax.set_ylabel(feature.capitalize())
+    ax.set_title(f"{feature.capitalize()} by genre (sorted by median)")
+    plt.setp(ax.get_xticklabels(), rotation=30, ha="right")
+    ax.grid(axis="x", visible=False)
+    fig.tight_layout()
+    s = res["summary"]
+    interp = (f"Median {feature} ranges from {s['median'].max():.2f} ({order[0]}) to {s['median'].min():.2f} "
+              f"({order[-1]}). The boxes overlap substantially, so even where the test is significant, genre "
+              f"explains only part of the variation (eta² = {res['eta2']:.3f}, epsilon² = {res['eps2']:.3f}).")
+    return fig, f"Figure 10. Echonest {feature} by top-level genre (genres with ≥ 30 tracks).", interp
+
+
+def fig_chi2_residuals(res):
+    r = res["residuals"]
+    fig, ax = plt.subplots(figsize=(6.5, 4.8))
+    lim = max(2.5, np.abs(r.to_numpy()).max())
+    im = ax.imshow(r, cmap=DIV, vmin=-lim, vmax=lim, aspect="auto")
+    ax.set_xticks(range(r.shape[1]), r.columns)
+    ax.set_yticks(range(r.shape[0]), r.index)
+    ax.grid(False)
+    for i in range(r.shape[0]):
+        for j in range(r.shape[1]):
+            ax.text(j, i, f"{res['table'].iloc[i, j]:,}\n({r.iloc[i, j]:+.1f})", ha="center", va="center",
+                    fontsize=7, color="white" if abs(r.iloc[i, j]) > lim * 0.6 else TEXT)
+    fig.colorbar(im, ax=ax, label="Standardized residual")
+    ax.set_title("Genre × release era: observed counts (residual)")
+    fig.tight_layout()
+    interp = ("Red cells have more tracks than expected if genre and era were independent; blue cells have "
+              "fewer. |residual| > 2 marks the cells driving the chi-square result.")
+    return fig, "Figure 11. Standardized residuals of the genre × era contingency table.", interp
+
+
+def fig_spearman(res):
+    d = res["results"].sort_values("rho")
+    fig, ax = plt.subplots(figsize=(7, 4))
+    colors = [BLUE if r > 0 else RED for r in d["rho"]]
+    ax.barh(d["feature"], d["rho"], color=colors, height=0.65, **_bar_style())
+    for y, (r, s) in enumerate(zip(d["rho"], d["significant"])):
+        ax.text(r, y, f" {r:+.3f}{' *' if s else ''} ", va="center", ha="left" if r >= 0 else "right",
+                fontsize=8, color=TEXT2)
+    ax.axvline(0, color=TEXT2, lw=1)
+    lim = max(0.15, d["rho"].abs().max() * 1.4)
+    ax.set_xlim(-lim, lim)
+    ax.set_xlabel("Spearman rho with log(1 + listens)   (* = significant after Holm)")
+    ax.set_title("Audio features vs. popularity")
+    ax.grid(axis="y", visible=False)
+    fig.tight_layout()
+    return fig, "Figure 12. Spearman correlation of each audio feature with log listens.", res["interpretation"]
