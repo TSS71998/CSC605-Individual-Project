@@ -278,7 +278,6 @@ def fig_energy_box(res, feature="energy"):
               f"explains only part of the variation (eta² = {res['eta2']:.3f}, epsilon² = {res['eps2']:.3f}).")
     return fig, f"Figure 10. Echonest {feature} by top-level genre (genres with ≥ 30 tracks).", interp
 
-
 def fig_chi2_residuals(res):
     r = res["residuals"]
     fig, ax = plt.subplots(figsize=(6.5, 4.8))
@@ -298,7 +297,6 @@ def fig_chi2_residuals(res):
               "fewer. |residual| > 2 marks the cells driving the chi-square result.")
     return fig, "Figure 11. Standardized residuals of the genre × era contingency table.", interp
 
-
 def fig_spearman(res):
     d = res["results"].sort_values("rho")
     fig, ax = plt.subplots(figsize=(7, 4))
@@ -315,3 +313,97 @@ def fig_spearman(res):
     ax.grid(axis="y", visible=False)
     fig.tight_layout()
     return fig, "Figure 12. Spearman correlation of each audio feature with log listens.", res["interpretation"]
+
+def fig_model_compare(table):
+    d = table.sort_values("macro_f1")
+    fig, ax = plt.subplots(figsize=(8, 3.8))
+    y = np.arange(len(d))
+    ax.set_ylim(-1.0, len(d) - 0.4)
+    ax.barh(y + 0.18, d["accuracy"], height=0.34, color=BLUE, label="Accuracy", **_bar_style())
+    ax.barh(y - 0.18, d["macro_f1"], height=0.34, color=ORANGE, label="Macro-F1", **_bar_style())
+    for yy, a, f in zip(y, d["accuracy"], d["macro_f1"]):
+        ax.text(a, yy + 0.18, f" {a:.3f}", va="center", fontsize=8, color=TEXT2)
+        ax.text(f, yy - 0.18, f" {f:.3f}", va="center", fontsize=8, color=TEXT2)
+    ax.axvline(1 / 8, color=TEXT2, ls=":", lw=1.2)
+    ax.text(1 / 8, -0.75, " chance (1/8)", fontsize=8, color=TEXT2, va="center")
+    ax.set_yticks(y, [f"{m}\n({r})" for m, r in zip(d["model"], d["role"])], fontsize=8)
+    ax.set_xlim(0, min(1, max(d["accuracy"].max(), d["macro_f1"].max()) * 1.25))
+    ax.set_xlabel("Test-set score")
+    ax.set_title("Model comparison on the held-out test split")
+    ax.legend(loc="lower right")
+    ax.grid(axis="y", visible=False)
+    fig.tight_layout()
+    best, base = d.iloc[-1], table[table["model"] == "Logistic Regression"].iloc[0]
+    if best["model"] == "Logistic Regression":
+        lead = (f"The logistic-regression baseline performs best (macro-F1 {best['macro_f1']:.3f}, accuracy "
+                f"{best['accuracy']:.3f}); the advanced models did not improve on it, which suggests the useful signal "
+                "here is mostly linear. ")
+    else:
+        lead = (f"{best['model']} performs best (macro-F1 {best['macro_f1']:.3f}, accuracy {best['accuracy']:.3f}), "
+                f"compared with the logistic-regression baseline's macro-F1 of {base['macro_f1']:.3f}. ")
+    interp = (lead + "All models beat "
+              "chance (0.125 for 8 balanced classes), so the audio features carry real genre information. Because the "
+              "classes are balanced, accuracy and macro-F1 are close; macro-F1 is the main metric because it weights "
+              "every genre equally.")
+    return fig, "Figure 13. Accuracy and macro-F1 of every model on the test split.", interp
+
+def fig_confusion(results, model):
+    cm = np.asarray(results["models"][model]["confusion"], float)
+    rates = cm / cm.sum(axis=1, keepdims=True)
+    classes = results["classes"]
+    fig, ax = plt.subplots(figsize=(7.2, 6))
+    im = ax.imshow(rates, cmap=SEQ, vmin=0, vmax=max(0.5, rates.max()))
+    ax.set_xticks(range(len(classes)), classes, rotation=40, ha="right")
+    ax.set_yticks(range(len(classes)), classes)
+    ax.set_xlabel("Predicted genre")
+    ax.set_ylabel("True genre")
+    ax.grid(False)
+    for i in range(len(classes)):
+        for j in range(len(classes)):
+            ax.text(j, i, f"{rates[i, j]:.0%}", ha="center", va="center", fontsize=8,
+                    color="white" if rates[i, j] > 0.35 else TEXT)
+    fig.colorbar(im, ax=ax, shrink=0.8, label="Share of true genre")
+    ax.set_title(f"Confusion matrix: {model} (test split, row-normalized)")
+    fig.tight_layout()
+    diag = pd.Series(np.diag(rates), index=classes)
+    off = rates.copy()
+    np.fill_diagonal(off, 0)
+    i, j = np.unravel_index(off.argmax(), off.shape)
+    interp = (f"{diag.idxmax()} is recognised best ({diag.max():.0%} correct) and {diag.idxmin()} worst "
+              f"({diag.min():.0%}). The most common mistake is labelling {classes[i]} as {classes[j]} "
+              f"({off[i, j]:.0%} of {classes[i]} tracks). This answers the second research question: confusions "
+              "concentrate in a few genre pairs, which suggests these genres sound similar at the level of these "
+              "features, or that their labels overlap.")
+    return fig, f"Figure 14. Row-normalized confusion matrix of the best model ({model}).", interp
+
+def fig_per_class_f1(results, model):
+    rep = results["models"][model]["report"].loc[results["classes"]]
+    d = rep.sort_values("f1-score")
+    fig, ax = plt.subplots(figsize=(7, 4))
+    ax.barh(d.index, d["f1-score"], color=BLUE, height=0.7, **_bar_style())
+    for y, v in enumerate(d["f1-score"]):
+        ax.text(v, y, f" {v:.2f}", va="center", fontsize=8, color=TEXT2)
+    ax.set_xlim(0, 1)
+    ax.set_xlabel("F1-score (test split)")
+    ax.set_title(f"Per-genre F1: {model}")
+    ax.grid(axis="y", visible=False)
+    fig.tight_layout()
+    interp = (f"F1 ranges from {d['f1-score'].min():.2f} ({d.index[0]}) to {d['f1-score'].max():.2f} "
+              f"({d.index[-1]}). Low-F1 genres are the ones the confusion matrix shows being absorbed by other genres.")
+    return fig, "Figure 15. Per-genre F1-score of the best model.", interp
+
+def fig_importance(results):
+    d = results["importance"].sort_values("importance_mean")
+    fig, ax = plt.subplots(figsize=(7.5, 4.3))
+    ax.barh(d["family"], d["importance_mean"], xerr=d["importance_std"], color=BLUE, height=0.7,
+            error_kw=dict(ecolor=TEXT2, lw=1), **_bar_style())
+    ax.set_xlabel("Drop in test macro-F1 when the family is shuffled")
+    ax.set_title(f"Grouped permutation importance: {results['best_model']}")
+    ax.grid(axis="y", visible=False)
+    fig.tight_layout()
+    top = d.iloc[::-1].head(3)
+    interp = (f"The feature families most associated with genre are {', '.join(top['family'])}. Shuffling "
+              f"{top['family'].iloc[0]} lowers macro-F1 by {top['importance_mean'].iloc[0]:.3f}. Features are "
+              "shuffled in groups because the 518 columns are highly correlated within a family, and shuffling one "
+              "column at a time would understate the importance of the family as a whole.")
+    return fig, "Figure 16. Permutation importance by feature family (best model, test split).", interp
