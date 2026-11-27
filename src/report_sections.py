@@ -1,14 +1,18 @@
-import json
+"""One render function per report section. app.py calls them one at a time
+(page navigation) or all in order (Full report, for the PDF export)."""
+import os
 
 import joblib
 import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
 
+import ai_assistant as ai
+import ai_context
 import cleaning
 import eda
 import stats_tests as stt
-from config import AI_LOG, DATASET_PAGE, ECHONEST_AUDIO, MODEL_RESULTS
+from config import DATASET_PAGE, ECHONEST_AUDIO, MODEL_RESULTS
 from data_loader import (feature_columns, load_cleaning_log, load_echonest,
                          load_missing_summary, load_small_features, load_tracks)
 from models import comparison_table, top_confusions
@@ -249,10 +253,14 @@ def stats_section():
         table(r1["results"].style.format({"statistic": "{:.3f}", "p_value": lambda p: pfmt(p)}),
                      hide_index=True)
         show_fig(eda.fig_energy_box(r1, feature))
-        with st.expander("Post-hoc comparisons (pairwise Mann-Whitney, Holm-corrected) and Tukey HSD"):
+        gh = r1["games_howell"]
+        st.markdown(f"**Post-hoc (Games-Howell):** {int(gh['significant'].sum())} of {len(gh)} genre pairs differ "
+                    "significantly. Full tables below.")
+        with st.expander("Post-hoc comparisons: Games-Howell (primary) and Holm-corrected Mann-Whitney (robustness)"):
+            table(gh.style.format({"mean_diff": "{:+.3f}", "se": "{:.4f}", "df": "{:.1f}",
+                                   "p_value": lambda p: pfmt(p)}), hide_index=True)
             table(r1["posthoc"].style.format({"median_diff": "{:+.3f}", "p_holm": lambda p: pfmt(p)}),
-                         hide_index=True)
-            table(r1["tukey"], hide_index=True)
+                  hide_index=True)
     _test_block(r1, t1_extra)
 
     r2 = test_chi2()
@@ -321,15 +329,127 @@ accuracy (is the true genre among the two most likely?); per-genre precision/rec
     st.subheader("5.3 Which feature families matter most?")
     show_fig(eda.fig_importance(res))
 
+def _load_secrets_into_env():
+    """Allow keys in .streamlit/secrets.toml as well as .env."""
+    try:
+        for k in ["LLM_PROVIDER", "LLM_MODEL", "GOOGLE_API_KEY", "OPENAI_API_KEY"]:
+            if k in st.secrets and not os.getenv(k):
+                os.environ[k] = str(st.secrets[k])
+    except Exception:
+        pass
+
+def _ai_data():
+    return {"tracks": tracks(), "small": small(), "echo": echo(), "miss": missing(), "log": clog(),
+            "energy": test_energy("energy"), "results": model_results()}
+
+def _run(question, context, stage, decision_id, structured=True):
+    try:
+        with st.spinner("Asking the model ..."):
+            ai.ask(question, context=context, stage=stage, decision_id=decision_id, structured=structured)
+        st.rerun()
+    except Exception as exc:  # show API / config errors instead of crashing the report
+        st.error(f"LLM call failed: {exc}")
+
+def _response_box(rec, empty_msg="Not run yet."):
+    if rec is None:
+        st.caption(empty_msg)
+        return
+    with st.container(border=True):
+        st.markdown(rec["response"])
+    st.caption(f"{rec.get('provider', '')} · {rec.get('model', '')}")
+
+def _show_prompt(prompt):
+    if PRINT_MODE["on"]:
+        st.markdown("**Full prompt sent (system + user, with the data context):**")
+        st.code(prompt, language="text")
+    else:
+        with st.expander("Full prompt sent (system message + data context)"):
+            st.code(prompt, language="text")
+
+def _decision_block(i, dec, data, verdicts):
+    st.subheader(f"Decision {i}: {dec['title']}")
+    st.caption(f"Stage: {dec['stage']}")
+    st.markdown(f"**Prompt question.** {dec['question']}")
+    rec = ai.latest(dec["id"])
+    _show_prompt(rec["prompt"] if rec else ai.render_prompt(
+        True, question=dec["question"], context=ai_context.build(dec["context"], data), stage=dec["stage"]))
+    st.markdown("**AI response:**")
+    _response_box(rec)
+    st.markdown(f"**What the analysis implemented.** {dec['implemented']}")
+    v = verdicts.get(dec["id"])
+    if v:
+        st.markdown(f"**Verdict: {v['verdict']}.** {v['justification']}")
+    else:
+        st.markdown("**Verdict:** not yet evaluated.")
+
 def ai_section():
     st.header("6. AI-assisted analysis")
-    st.info("This section is filled in during step 4 of the plan: the LangChain + LLM API assistant, "
-            "the prompts used for each major decision, and whether each AI suggestion was accepted, "
-            "modified or rejected (with justification).")
-    path = AI_LOG / "interactions.jsonl"
-    if path.exists():
-        rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
-        table(pd.DataFrame(rows), hide_index=True)
+    _load_secrets_into_env()
+    cfg = ai.settings()
+    st.markdown(f"""
+**How the assistant is integrated.** The app calls an LLM through **LangChain**
+(`ChatPromptTemplate | chat model | StrOutputParser`) using the **{cfg['provider']}** API.
+For each major decision, a prompt template is filled with **summary statistics computed from the data**
+(never raw rows), and the model is asked for a recommendation in a fixed format: recommendation, reasoning,
+assumptions/risks, and an alternative. Every prompt and response is saved to `ai_log/interactions.jsonl`.
+After reading each response I compared it with the data and recorded whether I **accepted, modified or
+rejected** it, and why (`ai_log/decisions.json`).
+""")
+    data = _ai_data()
+    verdicts = ai.load_verdicts()
+    log = ai.load_interactions()
+
+    # ---- 6.1 prompt design
+    st.subheader("6.1 Prompt design: naive vs. structured prompt")
+    demo = next(d for d in ai.DECISIONS if d["id"] == ai.PROMPT_DEMO_ID)
+    st.markdown(
+        "The same question asked two ways. The **naive** prompt has no role, no data and no output format. "
+        "The **structured** prompt gives the model a reviewer role, the actual data summary, the project goal "
+        "and a required answer format, and tells it not to invent numbers.")
+    naive_rec, struct_rec = ai.latest(demo["id"], "naive"), ai.latest(demo["id"], "structured")
+    st.markdown(f"**Naive prompt:** `{demo['naive_question']}`")
+    _response_box(naive_rec)
+    st.markdown("**Structured prompt:** the same question with role, data context and format (full prompt in "
+                "Decision 3 below).")
+    _response_box(struct_rec)
+    cmp = verdicts.get("prompt_comparison")
+    if cmp:
+        st.markdown(f"**Comparison.** {cmp['justification']}")
+
+    # ---- 6.2 decisions
+    st.subheader("6.2 AI assistance for each major decision")
+    for i, dec in enumerate(ai.DECISIONS, 1):
+        _decision_block(i, dec, data, verdicts)
+        st.write("")
+
+    # ---- 6.3 summary
+    st.subheader("6.3 Summary of AI recommendations")
+    summary = pd.DataFrame([{"decision": d["title"], "stage": d["stage"],
+                             "verdict": verdicts.get(d["id"], {}).get("verdict", "not evaluated"),
+                             "justification": verdicts.get(d["id"], {}).get("justification", "")}
+                            for d in ai.DECISIONS])
+    table(summary, hide_index=True)
+    counts = summary["verdict"].value_counts()
+    st.markdown("Verdict counts: " + ", ".join(f"**{k}** {v}" for k, v in counts.items()))
+
+    # ---- 6.4 live assistant
+    st.subheader("6.4 Ask the assistant")
+    free = [r for r in log if r["decision_id"].startswith("free")]
+    if not PRINT_MODE["on"]:
+        if cfg["has_key"]:
+            st.caption(f"Connected: {cfg['provider']} · {cfg['model']}")
+        else:
+            st.caption(f"No API key found. Add `{cfg['key_var'] or 'GOOGLE_API_KEY'}` to `.env` to ask questions.")
+        sec = st.selectbox("Context to include", list(ai_context.SECTION_CONTEXT), key="free_section")
+        q = st.text_area("Question (e.g. ask for code, a chart suggestion, or help interpreting a result)",
+                         key="free_q")
+        if st.button("Ask", key="ask_free", disabled=not cfg["has_key"] or not q.strip()):
+            _run(q, ai_context.build_section(sec, data), sec, f"free:{sec}")
+    elif not free:
+        st.markdown("No additional questions were asked.")
+    for r in free[::-1] if not PRINT_MODE["on"] else free:
+        st.markdown(f"**Q ({r['stage']}):** {r['question']}")
+        _response_box(r)
 
 def conclusions():
     st.header("7. Conclusions")

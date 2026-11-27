@@ -11,6 +11,8 @@ AI_LOG = ROOT / "ai_log"
 FMA_METADATA_URL = "https://os.unil.cloud.switch.ch/fma/fma_metadata.zip"
 DATASET_PAGE = "https://github.com/mdeff/fma"
 
+GITHUB_REPO = "https://github.com/TSS71998/CSC605-Individual-Project"
+
 TRACKS_PQ = DATA_PROCESSED / "tracks_clean.parquet"
 MISSING_CSV = DATA_PROCESSED / "missing_summary.csv"
 SMALL_FEATURES_PQ = DATA_PROCESSED / "small_features.parquet"

@@ -7,6 +7,8 @@ import streamlit as st
 import report_sections as rs
 from data_loader import processed_available
 
+from config import GITHUB_REPO
+
 st.set_page_config(page_title="FMA: Predicting Genre from Audio Features", layout="centered")
 
 SECTIONS = {
@@ -27,7 +29,8 @@ st.sidebar.caption("To export the PDF: open *Full report*, wait for everything t
                    "browser's Print → Save as PDF (or the ⋮ menu → Print).")
 
 st.title("Can audio features predict a track's genre?")
-st.caption("Free Music Archive (FMA) dataset · audio features to top-level genre")
+st.caption("Free Music Archive (FMA) dataset · audio features → top-level genre")
+st.markdown(f"**GitHub repository:** [{GITHUB_REPO}]({GITHUB_REPO})")
 
 if not processed_available():
     st.error("Processed data not found. From the repo root run:\n\n"
@@ -42,3 +45,6 @@ if choice.startswith("Full report"):
 else:
     rs.PRINT_MODE["on"] = False
     SECTIONS[choice]()
+    st.divider()
+
+st.markdown(f"**GitHub repository:** [{GITHUB_REPO}]({GITHUB_REPO})")

@@ -3,7 +3,6 @@ import itertools
 import numpy as np
 import pandas as pd
 from scipy import stats
-from statsmodels.stats.multicomp import pairwise_tukeyhsd
 from statsmodels.stats.multitest import multipletests
 
 ALPHA = 0.05
@@ -33,6 +32,23 @@ def welch_anova(groups):
     df1, df2 = k - 1, (k ** 2 - 1) / (3 * tmp)
     return F, df1, df2, stats.f.sf(F, df1, df2)
 
+def games_howell(d, feature, order):
+    """Games-Howell pairwise comparisons: no equal-variance or equal-n assumption
+    (the standard post-hoc test after Welch's ANOVA)."""
+    g = d.groupby("genre_top")[feature]
+    n, m, v = g.size(), g.mean(), g.var(ddof=1)
+    k = len(order)
+    rows = []
+    for a, b in itertools.combinations(order, 2):
+        va, vb = v[a] / n[a], v[b] / n[b]
+        se = np.sqrt(va + vb)
+        diff = m[a] - m[b]
+        df = (va + vb) ** 2 / (va ** 2 / (n[a] - 1) + vb ** 2 / (n[b] - 1))
+        q = abs(diff) / se * np.sqrt(2)
+        p = float(stats.studentized_range.sf(q, k, df))
+        rows.append({"group1": a, "group2": b, "mean_diff": diff, "se": se, "df": df,
+                     "p_value": p, "significant": p < ALPHA})
+    return pd.DataFrame(rows)
 
 def energy_by_genre(echo, feature="energy", min_n=30):
     """Test 1: is mean `feature` the same across top-level genres?"""
@@ -61,17 +77,20 @@ def energy_by_genre(echo, feature="energy", min_n=30):
     n, k = len(d), len(groups)
     eps2 = (H - k + 1) / (n - k)
 
+    ms_within = (ss_total - ss_between) / (n - k)
+    omega2 = (ss_between - (k - 1) * ms_within) / (ss_total + ms_within)
+    
     equal_var = lev_p >= ALPHA
     normal = norm_p >= ALPHA
+    min_group = min(len(g) for g in groups)
     if equal_var and normal:
         primary = ("One-way ANOVA", F, p_anova)
-    elif normal:
+    elif normal or min_group >= 30:
         primary = ("Welch's ANOVA", wF, p_welch)
     else:
         primary = ("Kruskal-Wallis H", H, p_kw)
 
-    tukey = pairwise_tukeyhsd(d[feature], d["genre_top"], alpha=ALPHA)
-    tk = pd.DataFrame(tukey.summary().data[1:], columns=tukey.summary().data[0])
+    gh = games_howell(d, feature, order)
 
     pairs = list(itertools.combinations(order, 2))
     mw_p = [stats.mannwhitneyu(d.loc[d.genre_top == a, feature],
@@ -92,11 +111,14 @@ def energy_by_genre(echo, feature="energy", min_n=30):
         + (f"{feature.capitalize()} is associated with genre: {top} has the highest median "
            f"({summary.loc[top, 'median']:.2f}) and {bottom} the lowest "
            f"({summary.loc[bottom, 'median']:.2f}). "
-           + (f"The effect size is epsilon-squared = {eps2:.3f} (rank-based; eta-squared = {eta2:.3f}), "
-              if name.startswith("Kruskal") else f"The effect size is eta-squared = {eta2:.3f}, ")
+                      + (f"The effect size is epsilon-squared = {eps2:.3f} (rank-based; eta-squared = {eta2:.3f}), "
+              if name.startswith("Kruskal") else
+              f"The effect size is eta-squared = {eta2:.3f} (omega-squared = {omega2:.3f}), ")
            + f"so genre accounts for roughly {100 * (eps2 if name.startswith('Kruskal') else eta2):.1f}% "
            f"of the variation in {feature}. "
-           f"{int(posthoc['significant'].sum())} of {len(posthoc)} genre pairs differ after Holm correction. "
+           f"Games-Howell post-hoc tests find {int(gh['significant'].sum())} of {len(gh)} genre pairs "
+           f"significantly different; the rank-based Kruskal-Wallis test (epsilon-squared = {eps2:.3f}) "
+           f"{'agrees' if (p_kw < ALPHA) == sig else 'disagrees'}. "
            if sig else f"There is no evidence that mean {feature} differs across genres. ")
         + "This is an association; it does not show that genre causes the difference."
     )
@@ -105,10 +127,13 @@ def energy_by_genre(echo, feature="energy", min_n=30):
         "h0": f"The mean {feature} is the same in every genre.",
         "h1": f"At least one genre has a different mean {feature}.",
         "why": (f"{feature.capitalize()} is continuous and genre is a categorical variable with "
-                f"{k} groups, so this is a k-sample comparison of means (one-way ANOVA). ANOVA assumes "
-                "roughly normal residuals and equal variances. We check both: if variances differ we use "
-                "Welch's ANOVA; if residuals are clearly non-normal we use Kruskal-Wallis, the rank-based "
-                "alternative. With large groups ANOVA is fairly robust, so all three are reported."),
+                f"{k} groups, so this is a k-sample comparison of means (one-way ANOVA). Classic ANOVA assumes "
+                "normal residuals and equal variances, so both are checked. If variances differ, Welch's ANOVA "
+                "is used: it does not assume equal variances, and with at least 30 tracks per genre the central "
+                "limit theorem makes it valid for comparing means even when residuals are not normal. "
+                "Games-Howell post-hoc tests are used because they also allow unequal variances and group "
+                "sizes (Tukey HSD would not). Kruskal-Wallis, with Holm-corrected pairwise Mann-Whitney tests, "
+                "is reported as a rank-based robustness check because some genres are strongly skewed."),
         "assumptions": pd.DataFrame({
             "check": ["Levene (equal variances)", "D'Agostino K² (normal residuals)"],
             "statistic": [lev_stat, norm_stat], "p_value": [lev_p, norm_p],
@@ -117,9 +142,9 @@ def energy_by_genre(echo, feature="energy", min_n=30):
             "test": ["One-way ANOVA", "Welch's ANOVA", "Kruskal-Wallis H"],
             "statistic": [F, wF, H], "df": [f"{k-1}, {n-k}", f"{wdf1:.0f}, {wdf2:.1f}", f"{k-1}"],
             "p_value": [p_anova, p_welch, p_kw],
-            "effect_size": [f"eta² = {eta2:.3f}", "", f"epsilon² = {eps2:.3f}"]}),
-        "primary": name, "statistic": stat, "p": p, "eta2": eta2, "eps2": eps2, "significant": sig,
-        "summary": summary, "tukey": tk, "posthoc": posthoc, "data": d, "order": list(order),
+            "effect_size": [f"eta² = {eta2:.3f}, omega² = {omega2:.3f}", "", f"epsilon² = {eps2:.3f}"]}),
+        "primary": name, "statistic": stat, "p": p, "eta2": eta2, "eps2": eps2, "omega2": omega2,
+        "significant": sig, "summary": summary, "games_howell": gh, "posthoc": posthoc, "data": d, "order": list(order),
         "interpretation": interp,
     }
 
