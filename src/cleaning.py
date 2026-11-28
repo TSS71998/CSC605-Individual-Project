@@ -70,9 +70,9 @@ def clean_tracks(tracks):
     invalid = t["duration"] <= 0
     log["duration_invalid_set_missing"] = int(invalid.sum())
     t.loc[invalid, "duration"] = np.nan
-    log_dur = np.log(t["duration"].dropna())
-    lo, hi = iqr_bounds(log_dur)
-    t["duration_outlier"] = (np.log(t["duration"]) < lo) | (np.log(t["duration"]) > hi)
+    log_dur = np.log(t["duration"])
+    lo, hi = iqr_bounds(log_dur.dropna())
+    t["duration_outlier"] = (log_dur < lo) | (log_dur > hi)
     log["duration_iqr_bounds_sec"] = [round(float(np.exp(lo)), 1), round(float(np.exp(hi)), 1)]
     log["duration_outliers_flagged"] = int(t["duration_outlier"].sum())
     log["duration_over_1h"] = int((t["duration"] > 3600).sum())
@@ -85,12 +85,12 @@ def clean_tracks(tracks):
     log["listens_zero"] = int((t["listens"] == 0).sum())
 
     # --- years
-    t["release_year"] = pd.to_datetime(t["album_date_released"], errors="coerce").dt.year
+    t["release_year"] = t["album_date_released"].dt.year  # dates parsed in load_raw_tracks
     implausible = (t["release_year"] < 1900) | (t["release_year"] > 2017)
     log["release_year_implausible_set_missing"] = int(implausible.sum())
     t.loc[implausible, "release_year"] = np.nan
     log["release_year_missing"] = int(t["release_year"].isna().sum())
-    t["upload_year"] = pd.to_datetime(t["date_created"], errors="coerce").dt.year
+    t["upload_year"] = t["date_created"].dt.year
     t["era"] = pd.cut(t["release_year"], bins=[1899, 1999, 2009, 2017],
                       labels=["Before 2000", "2000-2009", "2010-2017"])
 
@@ -99,8 +99,6 @@ def clean_tracks(tracks):
     t["genre_top"] = t["genre_top"].astype("category")
     t["subset"] = pd.Categorical(t["subset"], categories=["small", "medium", "large"],
                                  ordered=True)
-    for c in ["album_date_released", "date_created", "date_recorded"]:
-        t[c] = pd.to_datetime(t[c], errors="coerce")
     return t, log
 
 

@@ -105,23 +105,23 @@ def energy_by_genre(echo, feature="energy", min_n=30):
     name, stat, p = primary
     sig = p < ALPHA
     top, bottom = order[0], order[-1]
-    interp = (
-        f"Using {name} as the primary test (chosen from the assumption checks), "
-        f"{p_eq(p)}, so we {'reject' if sig else 'fail to reject'} H0 at alpha = {ALPHA}. "
-        + (f"{feature.capitalize()} is associated with genre: {top} has the highest median "
-           f"({summary.loc[top, 'median']:.2f}) and {bottom} the lowest "
-           f"({summary.loc[bottom, 'median']:.2f}). "
-                      + (f"The effect size is epsilon-squared = {eps2:.3f} (rank-based; eta-squared = {eta2:.3f}), "
-              if name.startswith("Kruskal") else
-              f"The effect size is eta-squared = {eta2:.3f} (omega-squared = {omega2:.3f}), ")
-           + f"so genre accounts for roughly {100 * (eps2 if name.startswith('Kruskal') else eta2):.1f}% "
-           f"of the variation in {feature}. "
-           f"Games-Howell post-hoc tests find {int(gh['significant'].sum())} of {len(gh)} genre pairs "
-           f"significantly different; the rank-based Kruskal-Wallis test (epsilon-squared = {eps2:.3f}) "
-           f"{'agrees' if (p_kw < ALPHA) == sig else 'disagrees'}. "
-           if sig else f"There is no evidence that mean {feature} differs across genres. ")
-        + "This is an association; it does not show that genre causes the difference."
-    )
+    rank_based = name.startswith("Kruskal")
+    effect = (f"epsilon-squared = {eps2:.3f} (rank-based; eta-squared = {eta2:.3f})" if rank_based
+              else f"eta-squared = {eta2:.3f} (omega-squared = {omega2:.3f})")
+    if sig:
+        detail = (f"{feature.capitalize()} is associated with genre: {top} has the highest median "
+                  f"({summary.loc[top, 'median']:.2f}) and {bottom} the lowest "
+                  f"({summary.loc[bottom, 'median']:.2f}). The effect size is {effect}, so genre accounts "
+                  f"for roughly {100 * (eps2 if rank_based else eta2):.1f}% of the variation in {feature}. "
+                  f"Games-Howell post-hoc tests find {int(gh['significant'].sum())} of {len(gh)} genre pairs "
+                  f"significantly different; the rank-based Kruskal-Wallis test (epsilon-squared = {eps2:.3f}) "
+                  f"{'agrees' if (p_kw < ALPHA) == sig else 'disagrees'}. ")
+    else:
+        detail = f"There is no evidence that mean {feature} differs across genres. "
+    interp = (f"Using {name} as the primary test (chosen from the assumption checks), "
+              f"{p_eq(p)}, so we {'reject' if sig else 'fail to reject'} H0 at alpha = {ALPHA}. "
+              + detail + "This is an association; it does not show that genre causes the difference.")
+    
     return {
         "name": f"{feature.capitalize()} across genres",
         "h0": f"The mean {feature} is the same in every genre.",

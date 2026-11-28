@@ -66,12 +66,20 @@ def model_results():
         return joblib.load(MODEL_RESULTS)
     return None
 
+def expander(label):
+    """Collapsible on screen; always expanded when printing, so the content reaches the PDF."""
+    if PRINT_MODE["on"]:
+        st.markdown(f"**{label}**")
+        return st.container()
+    return st.expander(label)
+
 def show_fig(result):
     fig, caption, interp = result
-    st.pyplot(fig, clear_figure=True)
-    plt.close(fig)
-    st.caption(caption)
-    st.markdown(f"**Interpretation.** {interp}")
+    with st.container(key="fig-" + caption.split(".")[0].split()[-1]):
+        st.pyplot(fig, clear_figure=True)
+        plt.close(fig)
+        st.caption(caption)
+        st.markdown(f"**Interpretation.** {interp}")
     st.write("")
 
 PRINT_MODE = {"on": False}
@@ -256,7 +264,7 @@ def stats_section():
         gh = r1["games_howell"]
         st.markdown(f"**Post-hoc (Games-Howell):** {int(gh['significant'].sum())} of {len(gh)} genre pairs differ "
                     "significantly. Full tables below.")
-        with st.expander("Post-hoc comparisons: Games-Howell (primary) and Holm-corrected Mann-Whitney (robustness)"):
+        with expander("Post-hoc comparisons: Games-Howell (primary) and Holm-corrected Mann-Whitney (robustness)"):
             table(gh.style.format({"mean_diff": "{:+.3f}", "se": "{:.4f}", "df": "{:.1f}",
                                    "p_value": lambda p: pfmt(p)}), hide_index=True)
             table(r1["posthoc"].style.format({"median_diff": "{:+.3f}", "p_holm": lambda p: pfmt(p)}),
@@ -281,8 +289,9 @@ def stats_section():
         table(r3["results"].style.format({"rho": "{:+.3f}", "p_value": lambda p: pfmt(p),
                                                  "p_holm": lambda p: pfmt(p)}), hide_index=True)
         fig, cap, _ = eda.fig_spearman(r3)
-        st.pyplot(fig, clear_figure=True)
-        st.caption(cap)
+        with st.container(key="fig-12"):
+            st.pyplot(fig, clear_figure=True)
+            st.caption(cap)
     _test_block(r3, t3_extra)
 
 def ml_section():
@@ -307,7 +316,7 @@ Hyperparameters are chosen by **validation macro-F1**, and each chosen model is 
 **Metrics.** Accuracy; **macro-F1** (primary, weights every genre equally); balanced accuracy; top-2
 accuracy (is the true genre among the two most likely?); per-genre precision/recall/F1; confusion matrix.
 """)
-    with st.expander("Validation results for every hyperparameter tried"):
+    with expander("Validation results for every hyperparameter tried"):
         table(res["tuning"].round(3), hide_index=True)
     ctable = comparison_table(res)
     st.subheader("5.1 Test-set comparison")
@@ -324,7 +333,7 @@ accuracy (is the true genre among the two most likely?); per-genre precision/rec
     st.markdown("**Most frequent confusions**")
     table(top_confusions(res, pick).style.format({"share of true genre": "{:.1%}"}), hide_index=True)
     show_fig(eda.fig_per_class_f1(res, pick))
-    with st.expander("Full classification report"):
+    with expander("Full classification report"):
         table(res["models"][pick]["report"].round(3))
     st.subheader("5.3 Which feature families matter most?")
     show_fig(eda.fig_importance(res))

@@ -13,16 +13,13 @@ import json
 import os
 from datetime import datetime, timezone
 
+from dotenv import load_dotenv
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
 from config import AI_LOG, ROOT
 
-try:
-    from dotenv import load_dotenv
-    load_dotenv(ROOT / ".env")
-except ImportError:
-    pass
+load_dotenv(ROOT / ".env")
 
 INTERACTIONS = AI_LOG / "interactions.jsonl"
 VERDICTS = AI_LOG / "decisions.json"
@@ -89,18 +86,15 @@ def render_prompt(structured, **kw):
 
 def ask(question, context="", stage="General", decision_id="free", structured=True, llm=None):
     """Call the model through LangChain and log the interaction. Returns the response text."""
-    chain = build_chain(structured, llm)
-    inputs = {"question": question, "context": context, "stage": stage}
-    if not structured:
-        inputs = {"question": question}
-    response = chain.invoke(inputs)
+    inputs = ({"question": question, "context": context, "stage": stage} if structured
+              else {"question": question})
+    response = build_chain(structured, llm).invoke(inputs)
     s = settings()
     log_interaction({
         "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "decision_id": decision_id, "variant": "structured" if structured else "naive",
         "provider": s["provider"], "model": s["model"], "stage": stage, "question": question,
-        "prompt": render_prompt(structured, **({"question": question, "context": context, "stage": stage}
-                                               if structured else {"question": question})),
+        "prompt": render_prompt(structured, **inputs),
         "response": response,
     })
     return response

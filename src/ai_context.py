@@ -1,5 +1,6 @@
 """Builds the compact, numeric context passed to the LLM for each decision.
 Only summaries are sent (counts, percentages, test statistics), never raw rows."""
+from models import comparison_table, top_confusions
 
 def _fmt_df(df, max_rows=15):
     return df.head(max_rows).to_string()
@@ -66,7 +67,6 @@ def models(d):
             "little of the variance and genres overlap in 2-D.")
 
 def results(d):
-    from models import comparison_table, top_confusions
     res = d["results"]
     if res is None:
         return "Model results not available yet."

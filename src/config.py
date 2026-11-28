@@ -5,7 +5,6 @@ DATA_RAW = ROOT / "data" / "raw"
 DATA_PROCESSED = ROOT / "data" / "processed"
 FIGURES = ROOT / "figures"
 RESULTS = ROOT / "results"
-REPORT = ROOT / "report"
 AI_LOG = ROOT / "ai_log"
 
 FMA_METADATA_URL = "https://os.unil.cloud.switch.ch/fma/fma_metadata.zip"
